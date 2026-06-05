@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start server",
+			"type": "shell",
+			"command": "cd server && npm start",
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
+			"label": "Start server",
+			"type": "shell",
+			"command": "cd server; npm start",
+			"isBackground": true,
+			"problemMatcher": []
+		}
+	]
+}
