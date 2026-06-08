@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api, { getErrorMessage } from "../api/client";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
+import { generateProfitLossPDF } from "../utils/reportGenerator";
 
 const blankProduct = {
   name: "",
@@ -32,6 +33,8 @@ const AdminPage = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [form, setForm] = useState(blankProduct);
   const [editingId, setEditingId] = useState("");
+  const [costMargin, setCostMargin] = useState(60);
+  const [fixedExpenses, setFixedExpenses] = useState(5000);
 
   const fetchAdminData = async () => {
     setLoading(true);
@@ -157,6 +160,40 @@ const AdminPage = () => {
     [stats]
   );
 
+  const finances = useMemo(() => {
+    let totalItemsPrice = 0;
+    let totalShipping = 0;
+    let totalTax = 0;
+    let totalRevenue = 0;
+
+    orders.forEach((order) => {
+      if (order.paymentStatus === "Paid" || order.status !== "Cancelled") {
+        totalItemsPrice += order.itemsPrice || 0;
+        totalShipping += order.shippingPrice || 0;
+        totalTax += order.taxPrice || 0;
+        totalRevenue += order.totalPrice || 0;
+      }
+    });
+
+    const cogs = totalItemsPrice * (costMargin / 100);
+    const grossProfit = totalItemsPrice - cogs;
+    const totalExpenses = cogs + totalTax + fixedExpenses;
+    const netProfit = totalItemsPrice - cogs - totalTax - fixedExpenses;
+    const isProfit = netProfit >= 0;
+
+    return {
+      totalItemsPrice,
+      totalShipping,
+      totalTax,
+      totalRevenue,
+      cogs,
+      grossProfit,
+      totalExpenses,
+      netProfit,
+      isProfit
+    };
+  }, [orders, costMargin, fixedExpenses]);
+
   return (
     <section className="container section">
       <div className="section-head">
@@ -191,6 +228,13 @@ const AdminPage = () => {
           onClick={() => setTab("orders")}
         >
           Orders
+        </button>
+        <button
+          type="button"
+          className={`ghost-btn ${tab === "reports" ? "active" : ""}`}
+          onClick={() => setTab("reports")}
+        >
+          Financial Report
         </button>
         <Link to="/admin/add-product" className="ghost-btn">
           Add Product (Full Stack Form)
@@ -399,6 +443,150 @@ const AdminPage = () => {
                     </div>
                   </article>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {tab === "reports" && (
+            <div className="panel reports-layout" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Business Profit & Loss Statement</h3>
+                  <p className="muted" style={{ margin: "0.2rem 0 0 0", fontSize: "0.9rem" }}>
+                    Real-time dynamic financial statement calculated based on {orders.length} active orders.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={() => generateProfitLossPDF(stats, orders, costMargin, fixedExpenses)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download Report (PDF)
+                </button>
+              </div>
+
+              {/* Sliders and adjustment metrics */}
+              <div className="reports-inputs-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+                <div className="field-label" style={{ background: "rgba(255,255,255,0.02)", padding: "1.2rem", borderRadius: "14px", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.6rem" }}>
+                    <span style={{ fontWeight: 600 }}>Product Cost Margin</span>
+                    <span style={{ color: "var(--purple-glow)", fontWeight: 700 }}>{costMargin}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="90"
+                    step="5"
+                    value={costMargin}
+                    onChange={(e) => setCostMargin(Number(e.target.value))}
+                    style={{ width: "100%", accentColor: "var(--purple)" }}
+                  />
+                  <span className="muted" style={{ fontSize: "0.78rem", marginTop: "0.4rem", display: "block" }}>
+                    Wholesale cost margin to calculate Cost of Goods Sold (COGS).
+                  </span>
+                </div>
+
+                <div className="field-label" style={{ background: "rgba(255,255,255,0.02)", padding: "1.2rem", borderRadius: "14px", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.6rem" }}>
+                    <span style={{ fontWeight: 600 }}>Fixed Operating Expenses</span>
+                    <span style={{ color: "var(--purple-glow)", fontWeight: 700 }}>INR {fixedExpenses}</span>
+                  </div>
+                  <input
+                    type="number"
+                    className="input"
+                    min="0"
+                    step="500"
+                    value={fixedExpenses}
+                    onChange={(e) => setFixedExpenses(Math.max(0, Number(e.target.value)))}
+                    style={{ padding: "0.45rem 0.6rem" }}
+                  />
+                  <span className="muted" style={{ fontSize: "0.78rem", marginTop: "0.4rem", display: "block" }}>
+                    Total rent, server costs, marketing, and employee payroll expenses.
+                  </span>
+                </div>
+              </div>
+
+              {/* Financial summary metrics */}
+              <div className="admin-stats" style={{ margin: "0.5rem 0" }}>
+                <article className="panel stat-card" style={{ borderLeft: "4px solid var(--success)" }}>
+                  <span>Base Product Sales</span>
+                  <strong>INR {finances.totalItemsPrice.toFixed(2)}</strong>
+                </article>
+                <article className="panel stat-card" style={{ borderLeft: "4px solid var(--danger)" }}>
+                  <span>Cost of Goods Sold (COGS)</span>
+                  <strong style={{ color: "#ff86a3" }}>INR {finances.cogs.toFixed(2)}</strong>
+                </article>
+                <article className="panel stat-card" style={{ borderLeft: "4px solid var(--danger)" }}>
+                  <span>Tax Collected</span>
+                  <strong style={{ color: "#ff86a3" }}>INR {finances.totalTax.toFixed(2)}</strong>
+                </article>
+                <article className="panel stat-card" style={{ borderLeft: `4px solid ${finances.isProfit ? "var(--success)" : "var(--danger)"}` }}>
+                  <span>{finances.isProfit ? "Net Profit" : "Net Loss"}</span>
+                  <strong style={{ color: finances.isProfit ? "#78f4ac" : "#ff86a3" }}>
+                    INR {finances.netProfit.toFixed(2)}
+                  </strong>
+                </article>
+              </div>
+
+              {/* Printable Table Format Preview */}
+              <div className="admin-table-wrap">
+                <h4>Financial Preview Statement</h4>
+                <div className="admin-table" style={{ marginTop: "0.8rem" }}>
+                  <div className="admin-row" style={{ gridTemplateColumns: "2fr 1fr 1fr", fontWeight: 700, background: "rgba(141, 53, 255, 0.15)", borderColor: "var(--purple)" }}>
+                    <div>Line Item / Category</div>
+                    <div>Amount (INR)</div>
+                    <div>% of Base Sales</div>
+                  </div>
+                  <div className="admin-row" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
+                    <div>Product Sales (Revenue)</div>
+                    <div style={{ color: "var(--success)" }}>+INR {finances.totalItemsPrice.toFixed(2)}</div>
+                    <div>100.0%</div>
+                  </div>
+                  <div className="admin-row" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
+                    <div>Cost of Goods Sold (COGS)</div>
+                    <div style={{ color: "var(--danger)" }}>-INR {finances.cogs.toFixed(2)}</div>
+                    <div>-{costMargin.toFixed(1)}%</div>
+                  </div>
+                  <div className="admin-row" style={{ gridTemplateColumns: "2fr 1fr 1fr", borderBottom: "2px solid var(--border)" }}>
+                    <div>Gross Profit Margin</div>
+                    <div style={{ fontWeight: 700 }}>INR {finances.grossProfit.toFixed(2)}</div>
+                    <div>{((finances.grossProfit / (finances.totalItemsPrice || 1)) * 100).toFixed(1)}%</div>
+                  </div>
+                  <div className="admin-row" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
+                    <div>Tax Collected (Liabilities)</div>
+                    <div style={{ color: "var(--danger)" }}>-INR {finances.totalTax.toFixed(2)}</div>
+                    <div>-{((finances.totalTax / (finances.totalItemsPrice || 1)) * 100).toFixed(1)}%</div>
+                  </div>
+                  <div className="admin-row" style={{ gridTemplateColumns: "2fr 1fr 1fr" }}>
+                    <div>Fixed Expenses (Operating Costs)</div>
+                    <div style={{ color: "var(--danger)" }}>-INR {fixedExpenses.toFixed(2)}</div>
+                    <div>-{((fixedExpenses / (finances.totalItemsPrice || 1)) * 100).toFixed(1)}%</div>
+                  </div>
+                  <div className="admin-row" style={{ gridTemplateColumns: "2fr 1fr 1fr", background: "rgba(255,255,255,0.02)", borderColor: finances.isProfit ? "var(--success)" : "var(--danger)" }}>
+                    <div style={{ fontWeight: 700 }}>{finances.isProfit ? "Net Profit" : "Net Loss"}</div>
+                    <div style={{ fontWeight: 700, color: finances.isProfit ? "var(--success)" : "var(--danger)" }}>
+                      INR {finances.netProfit.toFixed(2)}
+                    </div>
+                    <div style={{ fontWeight: 700, color: finances.isProfit ? "var(--success)" : "var(--danger)" }}>
+                      {((finances.netProfit / (finances.totalItemsPrice || 1)) * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

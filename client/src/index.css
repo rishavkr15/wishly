@@ -1102,4 +1102,33 @@ a {
   to { transform: rotate(360deg); }
 }
 
+/* Financial Reports range slider styling */
+.reports-inputs-grid input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--border);
+  outline: none;
+  margin: 10px 0;
+}
+
+.reports-inputs-grid input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--purple-glow);
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(141, 53, 255, 0.5);
+  transition: transform 0.15s ease;
+}
+
+.reports-inputs-grid input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: white;
+}
+
+
 
