@@ -4,13 +4,13 @@ import api, { getErrorMessage } from "../api/client";
 import { useCart } from "../context/CartContext";
 
 const emptyAddress = {
-  fullName: "",
-  phone: "",
-  line1: "",
+  fullName: "Rishav Kumar",
+  phone: "7780024121",
+  line1: "Boring Road, Patna",
   line2: "",
-  city: "",
-  state: "",
-  postalCode: "",
+  city: "Patna",
+  state: "BIHAR",
+  postalCode: "800001",
   country: "India"
 };
 
@@ -42,9 +42,65 @@ const CheckoutPage = () => {
     );
   }
 
+  const validateField = (name, value) => {
+    let err = "";
+    const trimmed = (value || "").trim();
+
+    if (name !== "line2" && !trimmed) {
+      const fieldName = name.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+      return `${fieldName} is required.`;
+    }
+
+    if (name === "fullName") {
+      if (!/^[A-Za-z\s]+$/.test(trimmed)) {
+        err = "Name can only contain alphabets and spaces.";
+      } else if (trimmed.length < 3) {
+        err = "Name must be at least 3 characters long.";
+      }
+    }
+
+    if (name === "phone") {
+      if (!/^\d*$/.test(value)) {
+        err = "Phone must contain only numbers.";
+      } else if (value.length !== 10) {
+        err = "Phone must be exactly 10 digits.";
+      } else if (!/^[6-9]/.test(value)) {
+        err = "Phone must start with 6, 7, 8, or 9.";
+      }
+    }
+
+    if (name === "postalCode") {
+      if (!/^\d*$/.test(value)) {
+        err = "Postal Code must contain only numbers.";
+      } else if (value.length !== 6) {
+        err = "Postal Code must be exactly 6 digits.";
+      }
+    }
+
+    return err;
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    let isValid = true;
+    Object.keys(address).forEach((key) => {
+      const err = validateField(key, address[key]);
+      if (err) {
+        errors[key] = err;
+        isValid = false;
+      }
+    });
+    setFormErrors(errors);
+    return isValid;
+  };
+
   const createPaymentSession = async () => {
-    setPaymentLoading(true);
     setError("");
+    if (!validateForm()) {
+      setError("Please fill in all required shipping details correctly before proceeding to payment.");
+      return;
+    }
+    setPaymentLoading(true);
     try {
       const { data } = await api.post("/payments/session", {
         items: items.map((item) => ({
@@ -75,6 +131,11 @@ const CheckoutPage = () => {
 
   const confirmPayment = async () => {
     if (!paymentSession) return;
+    setError("");
+    if (!validateForm()) {
+      setError("Please fill in all required shipping details correctly before completing payment.");
+      return;
+    }
     
     if (paymentSession.mode === "live" && paymentSession.provider === "RAZORPAY") {
       const loaded = await loadRazorpayScript();
@@ -147,7 +208,7 @@ const CheckoutPage = () => {
     setError("");
     setSuccess("");
 
-    if (Object.values(formErrors).some((err) => err !== "")) {
+    if (!validateForm()) {
       setLoading(false);
       setError("Please fix the validation errors in the form before submitting.");
       return;
@@ -194,7 +255,7 @@ const CheckoutPage = () => {
 
           {Object.entries(address).map(([key, value]) => {
             const isPhone = key === "phone";
-            const isFullName = key === "fullName";
+            const isPostalCode = key === "postalCode";
             return (
               <div key={key} className="field-group">
                 <label className="field-label">
@@ -203,28 +264,10 @@ const CheckoutPage = () => {
                     className="input"
                     required={key !== "line2"}
                     value={value}
-                    maxLength={isPhone ? 10 : undefined}
+                    maxLength={isPhone ? 10 : isPostalCode ? 6 : undefined}
                     onChange={(e) => {
                       const val = e.target.value;
-                      let err = "";
-                      
-                      if (isFullName) {
-                        if (val && !/^[A-Za-z\s]+$/.test(val)) {
-                          err = "Name can only contain alphabets and spaces.";
-                        }
-                      }
-                      
-                      if (isPhone) {
-                        const phoneRegex = /^[6-9]\d{9}$/;
-                        if (val && !phoneRegex.test(val)) {
-                          err = "Phone must be 10 digits and start with 6-9.";
-                        }
-                        if (val && !/^\d*$/.test(val)) {
-                           // if user types non-digits, just don't allow it or show error
-                           err = "Phone must contain only numbers.";
-                        }
-                      }
-                      
+                      const err = validateField(key, val);
                       setFormErrors((prev) => ({ ...prev, [key]: err }));
                       setAddress((prev) => ({ ...prev, [key]: val }));
                     }}

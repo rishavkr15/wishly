@@ -26,7 +26,7 @@ export const createPaymentSession = asyncHandler(async (req, res) => {
   const { totalPrice } = calculateOrderAmounts(normalizedItems);
   const amountInPaise = Math.round(totalPrice * 100);
 
-  if (provider === "STRIPE" && env.stripeSecretKey) {
+  if (env.enableLivePayments && provider === "STRIPE" && env.stripeSecretKey) {
     try {
       const { default: Stripe } = await import("stripe");
       const stripe = new Stripe(env.stripeSecretKey);
@@ -52,7 +52,7 @@ export const createPaymentSession = asyncHandler(async (req, res) => {
     }
   }
 
-  if (provider === "RAZORPAY" && env.razorpayKeyId && env.razorpayKeySecret) {
+  if (env.enableLivePayments && provider === "RAZORPAY" && env.razorpayKeyId && env.razorpayKeySecret) {
     try {
       const { default: Razorpay } = await import("razorpay");
       const razorpay = new Razorpay({
@@ -94,7 +94,7 @@ export const confirmPayment = asyncHandler(async (req, res) => {
     throw new Error("Unsupported payment provider");
   }
 
-  if (mode === "live" && paymentProvider === "STRIPE" && env.stripeSecretKey && sessionId) {
+  if (env.enableLivePayments && mode === "live" && paymentProvider === "STRIPE" && env.stripeSecretKey && sessionId) {
     try {
       const { default: Stripe } = await import("stripe");
       const stripe = new Stripe(env.stripeSecretKey);
@@ -117,7 +117,7 @@ export const confirmPayment = asyncHandler(async (req, res) => {
     }
   }
 
-  if (mode === "live" && paymentProvider === "RAZORPAY" && env.razorpayKeySecret && sessionId) {
+  if (env.enableLivePayments && mode === "live" && paymentProvider === "RAZORPAY" && env.razorpayKeySecret && sessionId) {
     try {
       const expectedSignature = crypto
         .createHmac("sha256", env.razorpayKeySecret)
